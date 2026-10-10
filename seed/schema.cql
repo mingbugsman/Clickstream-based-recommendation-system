@@ -9,3 +9,10 @@ CREATE TABLE IF NOT EXISTS recsys.events (
   event_type   text,
   PRIMARY KEY (session_id, event_time)
 );
+
+CREATE TABLE IF NOT EXISTS recsys.recommendations (
+  session_id   text PRIMARY KEY,
+  updated_at   timestamp,
+  markov       text,
+  gru4rec      text
+);
