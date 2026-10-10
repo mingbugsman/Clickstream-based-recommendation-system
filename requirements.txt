@@ -1,0 +1,10 @@
+pyspark==3.5.0
+kafka-python
+cassandra-driver
+redis
+pandas
+numpy
+scikit-learn
+torch
+flask
+flask-cors

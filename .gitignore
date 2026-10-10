@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+venv/
+.env
+
+# dataset gốc, không commit lên git vì quá nặng
+data/*.csv
+
+# model đã train
+models/*.pkl
+models/*.pt
+
+# node
+frontend/node_modules/
+frontend/build/
+
+# ide
+.vscode/
+.idea/
