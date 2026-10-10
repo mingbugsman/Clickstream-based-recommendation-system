@@ -8,9 +8,13 @@ from cassandra.cluster import Cluster
 
 from gru4rec import GRU4Rec
 
+# gioi han so luong CPU thread de tranh tinh trang qua tai luong (oversubscription)
+# lam cham training thay vi tang toc tren may nhieu core
+torch.set_num_threads(4)
+
 MAX_SEQ_LEN = 20
-BATCH_SIZE = 64
-EPOCHS = 5
+BATCH_SIZE = 512
+EPOCHS = 3
 LR = 1e-3
 
 CASSANDRA_HOST = os.environ.get("CASSANDRA_HOST", "127.0.0.1")
@@ -65,11 +69,18 @@ def collate(batch):
 
 
 def main():
+    print("loading sessions tu cassandra...", flush=True)
     sequences = load_sessions()
+    print(f"loaded {len(sequences)} sessions", flush=True)
+
     item2idx = build_vocab(sequences)
+    print(f"vocab size: {len(item2idx)}", flush=True)
 
     dataset = SessionDataset(sequences, item2idx)
+    print(f"built {len(dataset)} training samples", flush=True)
+
     loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=collate)
+    print(f"batches per epoch: {len(loader)}", flush=True)
 
     model = GRU4Rec(n_items=len(item2idx))
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
@@ -77,14 +88,16 @@ def main():
 
     for epoch in range(EPOCHS):
         total_loss = 0.0
-        for history, target in loader:
+        for batch_idx, (history, target) in enumerate(loader):
             optimizer.zero_grad()
             logits = model(history)
             loss = criterion(logits, target)
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
-        print(f"epoch {epoch + 1}/{EPOCHS} - loss {total_loss / len(loader):.4f}")
+            if batch_idx % 50 == 0:
+                print(f"  epoch {epoch + 1} batch {batch_idx}/{len(loader)}", flush=True)
+        print(f"epoch {epoch + 1}/{EPOCHS} - loss {total_loss / len(loader):.4f}", flush=True)
 
     torch.save(model.state_dict(), "models/gru4rec.pt")
     with open("models/item2idx.pkl", "wb") as f:
