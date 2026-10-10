@@ -2,18 +2,22 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from kafka import KafkaProducer
 import json
+import os
 import redis
 
 app = Flask(__name__)
 CORS(app)
 
+KAFKA_BOOTSTRAP = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
+
 producer = KafkaProducer(
-    bootstrap_servers="localhost:9092",
+    bootstrap_servers=KAFKA_BOOTSTRAP,
     value_serializer=lambda v: json.dumps(v).encode("utf-8"),
     key_serializer=lambda k: k.encode("utf-8"),
 )
 
-r = redis.Redis(host="localhost", port=6379, decode_responses=True)
+r = redis.Redis(host=REDIS_HOST, port=6379, decode_responses=True)
 
 
 @app.route("/api/track", methods=["POST"])
@@ -34,4 +38,4 @@ def recommend(session_id):
 
 
 if __name__ == "__main__":
-    app.run(port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)

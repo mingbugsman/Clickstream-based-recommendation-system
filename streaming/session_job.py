@@ -1,4 +1,5 @@
 import json
+import os
 import pickle
 
 import redis
@@ -21,8 +22,12 @@ schema = StructType() \
     .add("event_type", StringType()) \
     .add("timestamp", LongType())
 
+KAFKA_BOOTSTRAP = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+CASSANDRA_HOST = os.environ.get("CASSANDRA_HOST", "127.0.0.1")
+REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
+
 raw = spark.readStream.format("kafka") \
-    .option("kafka.bootstrap.servers", "localhost:9092") \
+    .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP) \
     .option("subscribe", "clickstream-events") \
     .option("startingOffsets", "latest") \
     .load()
@@ -56,8 +61,8 @@ sessions = events.groupBy("session_id").applyInPandasWithState(
 # load model markov + gru4rec mot lan duy nhat khi worker khoi dong, khong load lai moi batch
 load_models()
 
-redis_client = redis.Redis(host="localhost", port=6379, decode_responses=True)
-cassandra_session = Cluster(["127.0.0.1"]).connect("recsys")
+redis_client = redis.Redis(host=REDIS_HOST, port=6379, decode_responses=True)
+cassandra_session = Cluster([CASSANDRA_HOST]).connect("recsys")
 save_reco_stmt = cassandra_session.prepare(
     "INSERT INTO recommendations (session_id, updated_at, markov, gru4rec) VALUES (?, toTimestamp(now()), ?, ?)"
 )

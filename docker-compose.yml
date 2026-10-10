@@ -39,3 +39,31 @@ services:
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
+
+  spark-job:
+    build:
+      context: .
+      dockerfile: streaming/Dockerfile
+    depends_on: [kafka, redis, cassandra, spark-master]
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      REDIS_HOST: redis
+      CASSANDRA_HOST: cassandra
+    volumes:
+      - ./models:/app/models
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    depends_on: [kafka, redis]
+    ports: ["5000:5000"]
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      REDIS_HOST: redis
+
+  frontend:
+    build:
+      context: ./frontend
+    depends_on: [api]
+    ports: ["3000:3000"]
