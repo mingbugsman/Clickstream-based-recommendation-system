@@ -6,9 +6,10 @@ venv/
 # dataset gốc, không commit lên git vì quá nặng
 data/*.csv
 
-# model đã train
-models/*.pkl
-models/*.pt
+# model đã train (giữ lại script train, bỏ output nặng)
+models/markov.pkl
+models/gru4rec.pt
+models/item2idx.pkl
 
 # node
 frontend/node_modules/
