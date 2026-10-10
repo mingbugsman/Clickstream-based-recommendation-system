@@ -47,6 +47,8 @@ def get_topk_gru(session_items, k=5):
     with torch.no_grad():
         x = torch.tensor([idx_seq], dtype=torch.long)
         logits = _gru_model(x)
-        topk = torch.topk(logits, k=min(k, logits.shape[-1]), dim=-1).indices[0].tolist()
+        # bo qua index 0 vi do la padding_idx, khong phai item thuc
+        logits[0, 0] = float("-inf")
+        topk = torch.topk(logits, k=min(k, logits.shape[-1] - 1), dim=-1).indices[0].tolist()
 
     return [_idx2item[i] for i in topk if i in _idx2item]
