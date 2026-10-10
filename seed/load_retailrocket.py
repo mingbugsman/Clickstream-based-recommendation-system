@@ -1,8 +1,12 @@
+import os
+
 import pandas as pd
 from cassandra.cluster import Cluster
 
+CASSANDRA_HOST = os.environ.get("CASSANDRA_HOST", "127.0.0.1")
+
 df = pd.read_csv("data/events.csv")
-cluster = Cluster(["127.0.0.1"])
+cluster = Cluster([CASSANDRA_HOST])
 session = cluster.connect("recsys")
 
 insert_stmt = session.prepare(

@@ -1,9 +1,13 @@
+import os
+
 import pandas as pd
 from cassandra.cluster import Cluster
 from collections import defaultdict
 import pickle
 
-cluster = Cluster(["127.0.0.1"])
+CASSANDRA_HOST = os.environ.get("CASSANDRA_HOST", "127.0.0.1")
+
+cluster = Cluster([CASSANDRA_HOST])
 session = cluster.connect("recsys")
 rows = session.execute("SELECT session_id, item_id, event_time FROM events")
 df = pd.DataFrame(list(rows))

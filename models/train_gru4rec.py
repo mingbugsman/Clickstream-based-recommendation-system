@@ -1,3 +1,4 @@
+import os
 import pickle
 import pandas as pd
 import torch
@@ -12,9 +13,11 @@ BATCH_SIZE = 64
 EPOCHS = 5
 LR = 1e-3
 
+CASSANDRA_HOST = os.environ.get("CASSANDRA_HOST", "127.0.0.1")
+
 
 def load_sessions():
-    cluster = Cluster(["127.0.0.1"])
+    cluster = Cluster([CASSANDRA_HOST])
     session = cluster.connect("recsys")
     rows = session.execute("SELECT session_id, item_id, event_time FROM events")
     df = pd.DataFrame(list(rows))
