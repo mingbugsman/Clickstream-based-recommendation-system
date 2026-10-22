@@ -6,35 +6,41 @@ const API_URL = "http://localhost:5000";
 
 export default function ProductList({ onSelect }) {
   const [items, setItems] = useState([]);
-  const [cursor, setCursor] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+
+  // dung ref (khong phai state) de loadMore luon doc duoc gia tri MOI NHAT ngay lap tuc,
+  // tranh race condition: IntersectionObserver co the goi loadMore() nhieu lan truoc khi
+  // state (cursor/hasMore/loading) kip cap nhat qua re-render, gay tai trung trang dau
+  const cursorRef = useRef(0);
+  const hasMoreRef = useRef(true);
+  const loadingRef = useRef(false);
   const sentinelRef = useRef(null);
 
   const loadMore = async () => {
-    if (loading || !hasMore) return;
+    if (loadingRef.current || !hasMoreRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
     try {
       const res = await axios.get(`${API_URL}/api/products`, {
-        params: { cursor, limit: PAGE_SIZE },
+        params: { cursor: cursorRef.current, limit: PAGE_SIZE },
       });
       setItems((prev) => [...prev, ...res.data.items]);
-      setHasMore(res.data.next_cursor !== null);
-      setCursor(res.data.next_cursor ?? cursor);
+      const nextCursor = res.data.next_cursor;
+      hasMoreRef.current = nextCursor !== null;
+      setHasMore(hasMoreRef.current);
+      if (nextCursor !== null) cursorRef.current = nextCursor;
     } catch (err) {
+      hasMoreRef.current = false;
       setHasMore(false);
     } finally {
+      loadingRef.current = false;
       setLoading(false);
     }
   };
 
-  // tai trang dau tien
-  useEffect(() => {
-    loadMore();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // infinite scroll: tai them khi sentinel o cuoi danh sach lot vao viewport
+  // thiet lap IntersectionObserver 1 lan duy nhat; no tu kich hoat tai trang dau
+  // ngay khi sentinel nam trong viewport, khong can goi loadMore() rieng luc mount
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
@@ -49,7 +55,7 @@ export default function ProductList({ onSelect }) {
     observer.observe(el);
     return () => observer.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cursor, hasMore, loading]);
+  }, []);
 
   return (
     <div className="product-list">
