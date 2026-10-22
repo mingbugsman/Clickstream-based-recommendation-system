@@ -1,0 +1,28 @@
+{
+  "catalog_seed": 20261015,
+  "generator_version": "1.0.0",
+  "snapshot_at_ms": null,
+  "snapshot_mode": "LATEST_OBSERVED",
+  "price_policy": "NULL (not recovered from RetailRocket)",
+  "image_policy": "shared synthetic SVG placeholders",
+  "category_labels": "SYNTHETIC: do not interpret as original category semantics",
+  "training_policy": "do not use presentation fields as ground truth / model features",
+  "input_files": [
+    {
+      "name": "events.csv",
+      "bytes": 94237913
+    },
+    {
+      "name": "category_tree.csv",
+      "bytes": 14454
+    },
+    {
+      "name": "item_properties_part1.csv",
+      "bytes": 484315749
+    },
+    {
+      "name": "item_properties_part2.csv",
+      "bytes": 408929907
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "status": "PASS",
+  "generated_at_utc": "2026-10-15T09:52:40.460851+00:00",
+  "generator_version": "1.0.0",
+  "catalog_seed": 20261015,
+  "snapshot_mode": "LATEST_OBSERVED",
+  "snapshot_at_ms": null,
+  "products_total": 466868,
+  "products_with_original_category": 417053,
+  "products_without_original_category": 49815,
+  "products_with_events": 235061,
+  "original_category_tree_nodes": 1669,
+  "category_ids_missing_in_tree": 30,
+  "unique_names": 466868,
+  "duplicate_names": 0,
+  "unique_item_ids": 466868,
+  "placeholder_files": 13,
+  "missing_prices": 466868,
+  "deterministic_catalog_sha256": "50f8c0f106b32d8d6536dc90118955b417a72e528ada59b8f36d4ddf545a30d2",
+  "assertions": "PASS"
+}

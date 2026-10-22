@@ -6,6 +6,13 @@ venv/
 # dataset gốc, không commit lên git vì quá nặng
 data/*.csv
 
+# catalog gia lap sinh ra tu RetailRocket: giu file nho/metadata, bo file du lieu nang
+# (co the tai sinh lai deterministic tu generator_config.json + seed)
+data/RetailRocket_Catalog_Enrichment_Output/product_catalog.csv
+data/RetailRocket_Catalog_Enrichment_Output/product_catalog.parquet
+data/RetailRocket_Catalog_Enrichment_Output/product_presentation.parquet
+data/RetailRocket_Catalog_Enrichment_Output/product_snapshot.parquet
+
 # model da train (giu lai code train + eval csv nho, bo output nang)
 models/*.pkl
 models/*.pt

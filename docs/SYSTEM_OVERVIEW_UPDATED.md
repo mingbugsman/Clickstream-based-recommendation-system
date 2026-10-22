@@ -10,6 +10,7 @@
 - [Phase 0 — Chuẩn bị môi trường](#phase-0--chuẩn-bị-môi-trường)
 - [Phase 1 — Dựng hạ tầng Big Data bằng Docker Compose](#phase-1--dựng-hạ-tầng-big-data-bằng-docker-compose)
 - [Phase 2 — Nạp dữ liệu nền RetailRocket vào Cassandra](#phase-2--nạp-dữ-liệu-nền-retailrocket-vào-cassandra)
+- [Phase 2B — Tạo Synthetic Product Catalog từ RetailRocket](#phase-2b--tạo-synthetic-product-catalog-từ-retailrocket)
 - [Phase 3 — Xây website demo + client-side event tracking](#phase-3--xây-website-demo--client-side-event-tracking)
 - [Phase 4 — API Endpoint nhận sự kiện và đẩy vào Kafka](#phase-4--api-endpoint-nhận-sự-kiện-và-đẩy-vào-kafka)
 - [Phase 5 — Spark Structured Streaming: xử lý luồng theo phiên](#phase-5--spark-structured-streaming-xử-lý-luồng-theo-phiên)
@@ -177,9 +178,111 @@ services:
 
 ---
 
+## Phase 2B — Tạo Synthetic Product Catalog từ RetailRocket
+
+> **Phần bổ sung về Frontend/catalog (đề xuất thiết kế, chưa triển khai).** Mục tiêu là làm website có tên sản phẩm đa dạng, duy nhất, danh mục tiếng Việt rõ ràng và ảnh placeholder, trong khi **không sửa các file RetailRocket gốc** và **không xem dữ liệu tổng hợp là dữ liệu thực**.
+
+### 2B.1. Nguyên tắc dữ liệu và phạm vi
+
+- `events.csv`: chứa tương tác lịch sử; `item_properties.csv` (và phần bổ sung `item_properties_part1.csv`, `item_properties_part2.csv` nếu bộ tải về tách file) chứa các bản ghi thuộc tính có thời gian; `category_tree.csv` chứa quan hệ cha–con. Kiểm tra **tên file thực có trên máy** trước khi chạy script.
+- **Số bản ghi event/property khác số sản phẩm**. Lấy tập `item_id` duy nhất từ cả events và properties (không suy số item từ số dòng CSV). Việc enrich áp dụng theo item, không theo từng event.
+- Phân tách rõ **`raw/`** (bất biến), **`derived/`** (trích xuất có căn cứ theo thời điểm) và **`presentation/`** (giả lập nhằm hiển thị). Không ghi đè `item_id`, lịch sử tương tác, category ID gốc hay thông tin thời gian.
+- Category ID và cây category **không tiết lộ tên ngành hàng thực**. Danh mục tiếng Việt, loại sản phẩm, thương hiệu, hình ảnh, mô tả và giá được tạo thêm là **SYNTHETIC**, trừ khi có nguồn xác minh độc lập. Không suy luận rằng item thực sự là tai nghe, giày hoặc bàn phím chỉ vì tên đã sinh.
+- Việc huấn luyện/đánh giá Markov Chain, GRU4Rec tiếp tục dùng **ID và chuỗi tương tác thực**, không sử dụng tên/category ngữ nghĩa giả lập làm ground truth hoặc feature trừ khi sau này được xác minh riêng.
+
+### 2B.2. Pipeline tạo catalog theo lô
+
+```text
+RetailRocket CSV (read-only)
+  ├─ events + item_properties → unique item_id
+  ├─ item_properties          → categoryid, available theo thời điểm snapshot
+  └─ category_tree           → quan hệ category cha–con
+             ↓
+  derived product snapshot + category tree
+             ↓
+  deterministic category naming (SYNTHETIC)
+             ↓
+  deterministic product naming (SYNTHETIC) + placeholder
+             ↓
+  presentation catalog Parquet/CSV → import bảng catalog → Product API → React
+```
+
+1. Quét CSV **theo chunks hoặc DuckDB/Polars** để tránh giữ hàng chục triệu dòng thuộc tính trong RAM; gom `item_id` từ events và tất cả file property. Dùng output trung gian Parquet nếu cần.
+2. Chọn `snapshot_at` rõ ràng. Với `categoryid`/`available`, lấy bản ghi có `timestamp <= snapshot_at` mới nhất theo `(item_id, property)`; thiếu thì để `null`/`UNKNOWN`. Không lấy giá trị ở tương lai khi phát lại historical session. `available` không tự động có nghĩa là còn tồn kho hiện tại.
+3. Dựng cây danh mục giữ nguyên `categoryid → parentid`. Tạo bảng `category_presentation` ánh xạ **ổn định** từ category ID tới một tên tiếng Việt thuộc bộ từ vựng giả lập; các category con nhận tên nhất quán trong cùng nhánh. Gắn `name_source=SYNTHETIC`; ID và parent ID luôn lấy từ RetailRocket. Nếu không có category, dùng nhãn `Chưa phân loại`.
+4. Định nghĩa bộ từ vựng theo nhóm giả lập (Điện tử & Công nghệ, Thời trang & Phụ kiện, Nhà cửa & Đời sống, Thể thao & Du lịch, ...), mỗi nhóm có `product_type`, `brand`, `model`, `variant` thích hợp. **Chỉ dùng category giả lập đã gán**, không phân loại ngẫu nhiên độc lập từng item.
+5. Sinh tên theo hàm quyết định từ `item_id`, `category_id`, `CATALOG_SEED`, `GENERATOR_VERSION`; ví dụ `Aurora Wireless Headphones — Midnight / RR-248912`. Hậu tố mã `RR-{item_id}` **đảm bảo duy nhất** ngay cả khi tổ hợp từ ngữ trùng nhau; có thể ẩn hậu tố ở card rút gọn nếu luôn hiển thị ID ở chi tiết. Dùng seed cố định, từ điển versioned và sắp xếp ID trước khi xuất để chạy lại luôn cho cùng kết quả. Có unique constraint `item_id` và `display_name`.
+6. Ảnh sử dụng một **SVG placeholder tĩnh theo nhóm giả lập** (`/placeholders/electronics.svg`, ...) hoặc placeholder chung. **Không** tự gắn ảnh sản phẩm thật không có bằng chứng. Giá mặc định `null` và giao diện ghi `Chưa có giá xác thực`; nếu cần thử UX giỏ hàng bằng giá giả lập, lưu `demo_price`, `demo_currency` riêng và gắn `DEMO_ONLY`, không diễn giải là giá RetailRocket.
+7. Xuất catalog vào `data/presentation/product_catalog.parquet` cùng `data/presentation/category_mapping.parquet`; import vào bảng truy vấn đã tối ưu và index theo `item_id`, `category_id`. Catalog **không chứa một bản ghi cho mỗi event**. Sinh theo batch idempotent/upsert để chạy lại không nhân bản.
+
+### 2B.3. Schema đề xuất (không phải schema có sẵn trong RetailRocket)
+
+| Trường | Nguồn | Quy tắc |
+|---|---|---|
+| `item_id` | RetailRocket | Khóa chính gốc, không đổi |
+| `original_category_id`, `parent_category_id` | RetailRocket | Trích theo snapshot/cây category; có thể null |
+| `category_display_name` | SYNTHETIC | Tiếng Việt, ánh xạ ổn định theo category ID |
+| `display_name` | SYNTHETIC | Từ điển theo nhóm + mã duy nhất `RR-{item_id}` |
+| `image_url` | PLACEHOLDER | SVG chung/nhóm, không nhận là ảnh gốc |
+| `description` | SYNTHETIC/EMPTY | Template trung tính hoặc null; không bịa công dụng cụ thể |
+| `price`, `currency` | UNKNOWN | Null nếu không có nguồn xác thực |
+| `demo_price`, `demo_currency` | DEMO_ONLY | Tùy chọn, chỉ hiển thị có nhãn giá mô phỏng |
+| `availability_status`, `observed_at` | RetailRocket derived | Giá trị snapshot hoặc UNKNOWN |
+| `name_source`, `category_name_source`, `image_source` | Metadata | Công khai nguồn của từng trường |
+| `generator_version`, `catalog_seed`, `snapshot_at` | Metadata | Đảm bảo khả năng tái lập, kiểm toán |
+
+Ví dụ **minh họa giả lập**, không phải bản ghi RetailRocket đã xác minh:
+
+```json
+{
+  "item_id": "248912",
+  "original_category_id": "105",
+  "category_display_name": "Âm thanh & Tai nghe",
+  "category_name_source": "SYNTHETIC",
+  "display_name": "Aurora Wireless Headphones — Midnight / RR-248912",
+  "name_source": "SYNTHETIC",
+  "image_url": "/placeholders/electronics.svg",
+  "image_source": "PLACEHOLDER",
+  "price": null,
+  "currency": null,
+  "availability_status": "UNKNOWN",
+  "snapshot_at": null,
+  "generator_version": "1.0"
+}
+```
+
+### 2B.4. Quy tắc hiển thị Frontend
+
+- **Product list**: tìm kiếm theo tên giả lập/ID, lọc category tiếng Việt, phân trang phía server hoặc infinite scroll; không tải toàn bộ catalog lên browser.
+- **Product detail**: tên giả lập, ảnh placeholder, tên category rõ ràng, giá `Chưa có giá xác thực`, ID gốc trong thông tin sản phẩm. Có thể có **Shop View / Data View** để minh bạch dữ liệu gốc, dữ liệu dẫn xuất và trường giả lập.
+- **RecommendationPanel**: nhận `item_id` từ API mô hình, **join/lookup catalog theo ID** để render card. Nếu ID chưa có enrichment, fallback về `Sản phẩm #ID` + placeholder, không bỏ kết quả model. Có thể thêm nhãn `Danh mục/tên dùng cho minh họa` ở trang thông tin hoặc trang giới thiệu dataset.
+- **Giỏ hàng**: nếu chưa có giá thực, chỉ là mô phỏng `addtocart` để tạo sự kiện, **không hiển thị tổng thanh toán giả như tiền thật**.
+- **Historical Replay**: giữ event lịch sử tách biệt event live; khi replay cần dùng snapshot phù hợp với thời gian sự kiện và **không ghi lại thành hành vi người dùng thật**. Trạng thái demo/model phải nêu rõ mô hình đang dùng và thời điểm dữ liệu.
+
+### 2B.5. API bổ sung đề xuất (chưa có trong Flask mẫu)
+
+| API | Chức năng |
+|---|---|
+| `GET /api/products?cursor=...&limit=24&category=...` | Trả catalog phân trang, tìm/lọc phía server |
+| `GET /api/products/{item_id}` | Trả Product Presentation DTO và provenance |
+| `GET /api/categories` | Trả cây category có nhãn tiếng Việt giả lập và ID gốc |
+| `GET /api/recommend/{session_id}` | Giữ cấu trúc dự đoán ID gốc; React resolve thông tin hiển thị theo ID, hoặc API hỗ trợ batch lookup |
+| `POST /api/products/batch` | Lookup thông tin hiển thị cho danh sách item ID từ recommendation |
+
+### 2B.6. Kiểm thử / tiêu chí hoàn thành
+
+- Không có thay đổi nào ở checksum/file CSV nguồn; số event và chuỗi huấn luyện vẫn giống trước enrichment.
+- Mỗi `item_id` chỉ có **một** product catalog record; `display_name` không trùng (bao gồm hậu tố ID); mọi category nguyên bản giữ đúng parent ID.
+- Chạy lại cùng seed, version, snapshot và input → tạo **cùng catalog**; chạy lại không phát sinh bản ghi trùng.
+- 100% item trong catalog có `display_name` và placeholder; với `price` không rõ thì không có giá thương mại bịa đặt.
+- Tên sản phẩm khớp **nhóm category hiển thị giả lập**; người xem không bị dẫn đến hiểu nhầm ngành hàng giả lập là thông tin xác thực của RetailRocket.
+- API phân trang và sản phẩm gợi ý vẫn hoạt động với item chưa có ảnh/tên từ nguồn gốc.
+
+---
+
 ## Phase 3 — Xây website demo + client-side event tracking
 
-**Mục tiêu:** Có một website demo tối giản (danh sách sản phẩm, trang chi tiết, nút "Thêm vào giỏ") để người dùng thật tương tác, và mọi tương tác đó được ghi lại thành sự kiện gửi lên hệ thống.
+**Mục tiêu:** Có một website demo (danh sách sản phẩm, chi tiết, danh mục tiếng Việt, nút "Thêm vào giỏ") sử dụng **presentation catalog sinh tự động ở Phase 2B**, đồng thời ghi nhận tương tác trên **item ID RetailRocket gốc** vào hệ thống. Tên/category dễ đọc là dữ liệu SYNTHETIC, ảnh là PLACEHOLDER; không được trình bày như dữ liệu sản phẩm thực của RetailRocket.
 
 **Việc cần làm:**
 
@@ -215,7 +318,8 @@ services:
    }
    ```
 3. Gọi `trackEvent()` ở các điểm tương tác: khi mở trang chi tiết sản phẩm (`view`), khi bấm "Thêm vào giỏ" (`addtocart`).
-4. Tạo component hiển thị danh sách gợi ý (sẽ nối API ở Phase 9), đặt sẵn khung UI (ví dụ `<RecommendationPanel sessionId={...} />`).
+4. Tạo trang `/products` (server pagination/category filter), `/products/:itemId` (Shop View và Data View), card ảnh placeholder và thông tin provenance theo Phase 2B.
+5. Tạo component hiển thị danh sách gợi ý (sẽ nối API ở Phase 9), đặt sẵn khung UI (ví dụ `<RecommendationPanel sessionId={...} />`); resolve item ID dự đoán thành product card bằng catalog, fallback an toàn khi thiếu dữ liệu.
 
 **Kiểm tra:** Mở DevTools → tab Network, thao tác trên web thấy các request `POST /api/track` được gửi đi (API chưa chạy sẽ lỗi — là bình thường ở bước này).
 
@@ -439,6 +543,7 @@ Thấy JSON sự kiện hiện ra mỗi khi click trên web → Phase 4 thành c
    }, [sessionId]);
    ```
 3. Cho phép người dùng demo chọn xem gợi ý từ Markov Chain hay GRU4Rec để so sánh trực tiếp (dropdown hoặc tab).
+4. Mỗi `item_id` dự đoán được lookup từ Synthetic Product Catalog ở Phase 2B để hiện tên đa dạng, danh mục tiếng Việt và ảnh placeholder. Không dùng nhãn giả lập để khẳng định ý nghĩa thực của dự đoán.
 
 **Kiểm tra:** Click xem vài sản phẩm liên tiếp trên demo site → panel gợi ý tự cập nhật sau 1–2 giây, không cần tải lại trang.
 
@@ -507,6 +612,7 @@ Thấy JSON sự kiện hiện ra mỗi khi click trên web → Phase 4 thành c
 | 0 | Cài Docker, Python, Node.js, tạo cấu trúc project | ☐ |
 | 1 | Docker Compose: Kafka, Zookeeper, Spark, Redis, Cassandra | ☐ |
 | 2 | Nạp RetailRocket seed data vào Cassandra | ☐ |
+| 2B | Synthetic Product Catalog: tên độc nhất, category tiếng Việt, placeholder, tách nguồn | ☐ |
 | 3 | Website demo React + client-side tracking | ☐ |
 | 4 | API Endpoint nhận sự kiện → Kafka | ☐ |
 | 5 | Spark Structured Streaming xử lý theo session | ☐ |
