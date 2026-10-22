@@ -1,0 +1,4 @@
+method,n_queries,oov_rate,HR@5 (candidate),HR@5 (all),HR@10 (candidate),HR@10 (all),HR@20 (candidate),HR@20 (all),MRR@20 (candidate),MRR@20 (all)
+Most Popular,111965,0.16214888581253073,0.0041,0.0034,0.0087,0.0073,0.0133,0.0111,0.0022,0.0018
+Markov bac 1 (+ fallback Most Popular),111965,0.16214888581253073,0.297,0.2489,0.3387,0.2838,0.3658,0.3065,0.2221,0.1861
+GRU4Rec (dac ta goc),111965,0.16214888581253073,0.2567,0.215,0.2928,0.2453,0.3226,0.2703,0.1967,0.1648
