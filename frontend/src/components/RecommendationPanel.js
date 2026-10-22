@@ -1,22 +1,31 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { shortName } from "../format";
 
 const API_URL = "http://localhost:5000";
 
-export default function RecommendationPanel({ sessionId, onSelect }) {
+function formatTime(date) {
+  return date.toLocaleTimeString("vi-VN", { hour12: false });
+}
+
+export default function RecommendationPanel({ sessionId, onSelect, hasHistory }) {
   const [recommendations, setRecommendations] = useState({ markov: [], gru4rec: [] });
   const [model, setModel] = useState("markov");
   const [products, setProducts] = useState({}); // item_id -> product DTO | null
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   useEffect(() => {
-    const interval = setInterval(async () => {
+    const fetchReco = async () => {
       try {
         const res = await axios.get(`${API_URL}/api/recommend/${sessionId}`);
         setRecommendations(res.data);
+        setLastUpdated(new Date());
       } catch (err) {
         // bo qua loi khi API/redis chua co du lieu
       }
-    }, 2000);
+    };
+    fetchReco();
+    const interval = setInterval(fetchReco, 2000);
     return () => clearInterval(interval);
   }, [sessionId]);
 
@@ -39,7 +48,7 @@ export default function RecommendationPanel({ sessionId, onSelect }) {
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-1">
         <h2 className="text-lg font-semibold text-gray-800">Goi y cho ban</h2>
         <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-sm">
           {[
@@ -59,9 +68,14 @@ export default function RecommendationPanel({ sessionId, onSelect }) {
         </div>
       </div>
 
+      <p className="text-xs text-gray-400 mb-4">
+        {hasHistory ? "Dua tren hanh vi phien hien tai" : "Chua co hanh vi — dang hien pho bien"}
+        {lastUpdated && ` · cap nhat luc ${formatTime(lastUpdated)}`}
+      </p>
+
       {items.length === 0 ? (
         <p className="text-sm text-gray-400 py-6 text-center">
-          Chua co du lieu hanh vi. Hay xem mot san pham de he thong sinh goi y.
+          He thong chua tra ve goi y nao cho phien nay.
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-3">
@@ -82,7 +96,7 @@ export default function RecommendationPanel({ sessionId, onSelect }) {
                 </div>
                 <div className="p-2">
                   <p className="text-xs text-gray-700 font-medium line-clamp-2 min-h-[2rem]">
-                    {product ? product.display_name : `San pham #${itemId}`}
+                    {product ? shortName(product.display_name) : `San pham #${itemId}`}
                   </p>
                 </div>
               </button>

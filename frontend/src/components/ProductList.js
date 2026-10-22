@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
+import { shortName } from "../format";
 
 const PAGE_SIZE = 24;
 const API_URL = "http://localhost:5000";
@@ -81,7 +82,7 @@ export default function ProductList({ onSelect, selectedId }) {
                 {p.category_display_name}
               </p>
               <p className="text-sm text-gray-800 font-medium line-clamp-2 mt-0.5 min-h-[2.5rem]">
-                {p.display_name}
+                {shortName(p.display_name)}
               </p>
               <p className="text-xs text-gray-400 mt-1">{p.price_note}</p>
             </div>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { trackEvent } from "../tracking";
+import { shortName } from "../format";
 
 const API_URL = "http://localhost:5000";
 
@@ -65,7 +66,7 @@ export default function ProductDetail({ productId }) {
         <span className="inline-block text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full mb-2">
           {product.category_display_name}
         </span>
-        <h2 className="text-xl font-semibold text-gray-900">{product.display_name}</h2>
+        <h2 className="text-xl font-semibold text-gray-900">{shortName(product.display_name)}</h2>
         <p className="text-gray-500 mt-1">{product.price_note || "Chua co gia xac thuc"}</p>
 
         <button

@@ -2,6 +2,7 @@ import { useState } from "react";
 import ProductList from "./components/ProductList";
 import ProductDetail from "./components/ProductDetail";
 import RecommendationPanel from "./components/RecommendationPanel";
+import ViewHistory from "./components/ViewHistory";
 import Dashboard from "./components/Dashboard";
 import { getSessionId } from "./tracking";
 
@@ -13,7 +14,13 @@ const TABS = [
 export default function App() {
   const [tab, setTab] = useState("storefront");
   const [selectedProductId, setSelectedProductId] = useState(null);
+  const [history, setHistory] = useState([]); // cac item_id da xem trong phien nay, theo thu tu
   const sessionId = getSessionId();
+
+  const handleSelect = (productId) => {
+    setSelectedProductId(productId);
+    setHistory((prev) => (prev[prev.length - 1] === productId ? prev : [...prev, productId]));
+  };
 
   return (
     <div className="min-h-screen">
@@ -39,10 +46,12 @@ export default function App() {
       <main className="max-w-6xl mx-auto px-6 py-8">
         {tab === "storefront" ? (
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-8 items-start">
-            <ProductList onSelect={setSelectedProductId} selectedId={selectedProductId} />
+            <ProductList onSelect={handleSelect} selectedId={selectedProductId} />
 
             {/* panel ben phai dinh lai khi cuon, de xem goi y khong phai keo xuong qua danh sach dai */}
             <div className="lg:sticky lg:top-24 space-y-6">
+              <ViewHistory history={history} />
+
               {selectedProductId ? (
                 <ProductDetail productId={selectedProductId} />
               ) : (
@@ -50,7 +59,7 @@ export default function App() {
                   Chon mot san pham ben trai de xem chi tiet.
                 </div>
               )}
-              <RecommendationPanel sessionId={sessionId} onSelect={setSelectedProductId} />
+              <RecommendationPanel sessionId={sessionId} onSelect={handleSelect} hasHistory={history.length > 0} />
             </div>
           </div>
         ) : (
