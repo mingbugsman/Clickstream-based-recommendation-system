@@ -16,7 +16,14 @@ export default function ProductDetail({ productId }) {
         if (!cancelled) setProduct(res.data);
       })
       .catch(() => {
-        if (!cancelled) setProduct({ item_id: productId, display_name: `San pham #${productId}`, category_display_name: "Chua phan loai" });
+        if (!cancelled) {
+          setProduct({
+            item_id: productId,
+            display_name: `San pham #${productId}`,
+            category_display_name: "Chua phan loai",
+            image_url: "/placeholders/generic.svg",
+          });
+        }
       });
     return () => {
       cancelled = true;
@@ -33,6 +40,7 @@ export default function ProductDetail({ productId }) {
 
   return (
     <div className="product-detail">
+      <img src={product.image_url} alt={product.display_name} width={120} height={120} />
       <h2>{product.display_name}</h2>
       <p>Danh muc: {product.category_display_name}</p>
       <p>Gia: {product.price_note || "Chua co gia xac thuc"}</p>
