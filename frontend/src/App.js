@@ -48,8 +48,10 @@ export default function App() {
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-8 items-start">
             <ProductList onSelect={handleSelect} selectedId={selectedProductId} />
 
-            {/* panel ben phai dinh lai khi cuon, de xem goi y khong phai keo xuong qua danh sach dai */}
-            <div className="lg:sticky lg:top-24 space-y-6">
+            {/* panel ben phai dinh lai khi cuon; gioi han chieu cao theo man hinh va tu cuon
+                rieng ben trong, neu khong noi dung (lich su + chi tiet + goi y) dai hon
+                man hinh se bi tran ra ngoai va khong the cuon de xem phan con lai */}
+            <div className="lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto space-y-6 pr-1">
               <ViewHistory history={history} />
 
               {selectedProductId ? (
