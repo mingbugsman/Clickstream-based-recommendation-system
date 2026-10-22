@@ -4,7 +4,7 @@ import axios from "axios";
 const PAGE_SIZE = 24;
 const API_URL = "http://localhost:5000";
 
-export default function ProductList({ onSelect }) {
+export default function ProductList({ onSelect, selectedId }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -58,18 +58,44 @@ export default function ProductList({ onSelect }) {
   }, []);
 
   return (
-    <div className="product-list">
-      <h2>San pham</h2>
-      <ul>
+    <div>
+      <h2 className="text-lg font-semibold text-gray-800 mb-4">San pham</h2>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
         {items.map((p) => (
-          <li key={p.item_id} onClick={() => onSelect(p.item_id)}>
-            {p.display_name} — {p.category_display_name}
-          </li>
+          <button
+            key={p.item_id}
+            onClick={() => onSelect(p.item_id)}
+            className={`group text-left bg-white rounded-xl border overflow-hidden transition shadow-sm hover:shadow-md hover:-translate-y-0.5 ${
+              selectedId === p.item_id ? "ring-2 ring-indigo-500 border-indigo-500" : "border-gray-200"
+            }`}
+          >
+            <div className="aspect-square bg-gray-50 flex items-center justify-center p-4">
+              <img
+                src={p.image_url}
+                alt={p.display_name}
+                className="max-h-full max-w-full object-contain"
+              />
+            </div>
+            <div className="p-3">
+              <p className="text-xs text-indigo-600 font-medium truncate">
+                {p.category_display_name}
+              </p>
+              <p className="text-sm text-gray-800 font-medium line-clamp-2 mt-0.5 min-h-[2.5rem]">
+                {p.display_name}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">{p.price_note}</p>
+            </div>
+          </button>
         ))}
-      </ul>
-      {loading && <p>Dang tai...</p>}
-      {!hasMore && items.length > 0 && <p>Da het san pham.</p>}
-      <div ref={sentinelRef} style={{ height: 1 }} />
+      </div>
+
+      {loading && (
+        <p className="text-center text-sm text-gray-400 py-6">Dang tai them san pham...</p>
+      )}
+      {!hasMore && items.length > 0 && (
+        <p className="text-center text-sm text-gray-400 py-6">Da hien thi toan bo san pham.</p>
+      )}
+      <div ref={sentinelRef} className="h-1" />
     </div>
   );
 }

@@ -3,7 +3,7 @@ import axios from "axios";
 
 const API_URL = "http://localhost:5000";
 
-export default function RecommendationPanel({ sessionId }) {
+export default function RecommendationPanel({ sessionId, onSelect }) {
   const [recommendations, setRecommendations] = useState({ markov: [], gru4rec: [] });
   const [model, setModel] = useState("markov");
   const [products, setProducts] = useState({}); // item_id -> product DTO | null
@@ -38,38 +38,58 @@ export default function RecommendationPanel({ sessionId }) {
   }, [items]);
 
   return (
-    <div className="recommendation-panel">
-      <h2>Goi y cho ban</h2>
-      <div>
-        <label>
-          <input
-            type="radio"
-            checked={model === "markov"}
-            onChange={() => setModel("markov")}
-          />
-          Markov Chain
-        </label>
-        <label>
-          <input
-            type="radio"
-            checked={model === "gru4rec"}
-            onChange={() => setModel("gru4rec")}
-          />
-          GRU4Rec
-        </label>
+    <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold text-gray-800">Goi y cho ban</h2>
+        <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-sm">
+          {[
+            { key: "markov", label: "Markov Chain" },
+            { key: "gru4rec", label: "GRU4Rec" },
+          ].map((opt) => (
+            <button
+              key={opt.key}
+              onClick={() => setModel(opt.key)}
+              className={`px-3 py-1 rounded-md transition ${
+                model === opt.key ? "bg-indigo-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-800"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
-      <ul>
-        {items.map((itemId) => {
-          const product = products[itemId];
-          return (
-            <li key={itemId}>
-              {product
-                ? `${product.display_name} — ${product.category_display_name}`
-                : `San pham #${itemId}`}
-            </li>
-          );
-        })}
-      </ul>
+
+      {items.length === 0 ? (
+        <p className="text-sm text-gray-400 py-6 text-center">
+          Chua co du lieu hanh vi. Hay xem mot san pham de he thong sinh goi y.
+        </p>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          {items.map((itemId) => {
+            const product = products[itemId];
+            return (
+              <button
+                key={itemId}
+                onClick={() => onSelect && onSelect(itemId)}
+                className="text-left bg-gray-50 rounded-lg border border-gray-100 overflow-hidden hover:shadow-sm hover:border-indigo-300 transition"
+              >
+                <div className="aspect-square bg-white flex items-center justify-center p-2">
+                  <img
+                    src={product ? product.image_url : "/placeholders/generic.svg"}
+                    alt={product ? product.display_name : itemId}
+                    className="max-h-full max-w-full object-contain"
+                  />
+                </div>
+                <div className="p-2">
+                  <p className="text-xs text-gray-700 font-medium line-clamp-2 min-h-[2rem]">
+                    {product ? product.display_name : `San pham #${itemId}`}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

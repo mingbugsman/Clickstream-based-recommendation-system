@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from kafka import KafkaProducer
+from collections import deque
 import json
 import os
 import redis
@@ -21,6 +22,10 @@ producer = KafkaProducer(
 
 r = redis.Redis(host=REDIS_HOST, port=6379, decode_responses=True)
 
+# bo dem trong bo nho cho Dashboard Event Monitor - chi phuc vu hien thi/demo,
+# khong phai nguon du lieu that cua pipeline (Kafka/Spark/Cassandra moi la that)
+_recent_events = deque(maxlen=50)
+
 
 @app.route("/api/track", methods=["POST"])
 def track():
@@ -30,7 +35,14 @@ def track():
         key=event["session_id"],  # key = session_id -> dam bao cung phien vao cung partition
         value=event,
     )
+    _recent_events.appendleft(event)
     return jsonify({"status": "ok"}), 200
+
+
+@app.route("/api/events/recent", methods=["GET"])
+def recent_events():
+    limit = min(int(request.args.get("limit", 20)), 50)
+    return jsonify(list(_recent_events)[:limit])
 
 
 @app.route("/api/recommend/<session_id>", methods=["GET"])
